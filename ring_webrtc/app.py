@@ -5,39 +5,49 @@ from aiohttp import web
 from ring_doorbell import Ring, RingDoorBell
 from ring_doorbell.webrtcstream import RingWebRtcStream
 
-from .helpers import cleanup_ctx
+from .helpers import cleanup_ctx, periodic_updates
 
 APP_RING_API = web.AppKey('ring_api', Ring)
 APP_UPDATE_LOCK = web.AppKey('update_lock', asyncio.Lock)
-APP_UPDATE_INTERVAL = web.AppKey('update_lock', int)
+APP_UPDATE_INTERVAL = web.AppKey('update_lock', float)
+APP_BACKOFF_INTERVAL = web.AppKey('update_lock', float)
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def create_whep_app(ring: Ring, *, update_interval: int=3600):
+async def create_whep_app(
+    ring: Ring,
+    *,
+    update_interval: int=3600,
+    backoff_interval: int=60,
+):
     app = web.Application()
 
     app[APP_RING_API] = ring
     app[APP_UPDATE_LOCK] = asyncio.Lock()
     app[APP_UPDATE_INTERVAL] = update_interval
+    app[APP_BACKOFF_INTERVAL] = backoff_interval
 
     app.router.add_view('/{device_id}/whep', WhepView)
     app.router.add_view('/{device_id}/whep/{session_id}', WhepResourceView)
 
+    @cleanup_ctx
+    @periodic_updates(
+        interval=app[APP_UPDATE_INTERVAL],
+        backoff=app[APP_BACKOFF_INTERVAL],
+    )
+    async def update_devices(app: web.Application):
+        while True:
+            async with app[APP_UPDATE_LOCK]:
+                _LOGGER.info('Updating Ring devices...')
+                await app[APP_RING_API].async_update_devices()
+                _LOGGER.info('Ring devices updated')
+
+            await asyncio.sleep(app[APP_UPDATE_INTERVAL])
+
     app.cleanup_ctx.append(update_devices)
 
     return app
-
-
-@cleanup_ctx
-async def update_devices(app: web.Application):
-    while True:
-        async with app[APP_UPDATE_LOCK]:
-            _LOGGER.info('Updating Ring devices...')
-            await app[APP_RING_API].async_update_devices()
-            _LOGGER.info('Ring devices updated')
-
-        await asyncio.sleep(app[APP_UPDATE_INTERVAL])
 
 
 class CameraDeviceView(web.View):
