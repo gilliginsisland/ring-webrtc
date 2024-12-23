@@ -1,10 +1,11 @@
 [project]
 name = "ring-webrtc"
-version = "0.1.0"
+version = "1.0.3"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "systemd-python>=235",
     "aiohttp>=3.11.10",
     "ring-doorbell>=0.9.13",
 ]
