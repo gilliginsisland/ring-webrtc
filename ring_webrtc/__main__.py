@@ -15,6 +15,7 @@ from ring_doorbell.const import (
 	USER_AGENT,
 )
 
+from .middleware import IdleShutdown
 from .token_manager import TokenManager
 from .app import create_whep_app
 
@@ -95,13 +96,16 @@ def main():
 	)
 	ring = Ring(auth)
 
+	app = create_whep_app(ring)
+
 	if args.systemd:
 		sockets = _get_systemd_sockets()
 		logging.info(f"Starting web application on systemd sockets")
-		web.run_app(create_whep_app(ring), sock=sockets)
+		IdleShutdown().setup(app)
+		web.run_app(app, sock=sockets)
 	else:
 		logging.info(f"Starting web application on {args.address}:{args.port}")
-		web.run_app(create_whep_app(ring), host=args.address, port=args.port)
+		web.run_app(app, host=args.address, port=args.port)
 
 if __name__ == '__main__':
 	main()

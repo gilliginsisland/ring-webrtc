@@ -39,6 +39,8 @@ def periodic_updates(interval: float, backoff: float):
 			while True:
 				try:
 					await func(*args, **kwargs)
+				except asyncio.CancelledError:
+					raise
 				except Exception:
 					_LOGGER.exception(f'Error occurred while running "{func.__name__}": retrying in {backoff} seconds...')
 					await asyncio.sleep(backoff)
