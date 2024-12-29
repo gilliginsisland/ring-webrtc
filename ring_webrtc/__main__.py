@@ -66,6 +66,12 @@ def main():
 		action='store_true',
 	)
 	parser.add_argument(
+		'-t', '--timeout',
+		help='Enable shutdown after <timeout> seconds of no activity.',
+		type=int,
+		default=0,
+	)
+	parser.add_argument(
 		'-f', '--token-file',
 		help='The file where the ring auth token is stored.',
 		type=Path,
@@ -98,10 +104,12 @@ def main():
 
 	app = create_whep_app(ring)
 
+	if args.timeout:
+		IdleShutdown(idle_timeout=args.timeout).setup(app)
+
 	if args.systemd:
 		sockets = _get_systemd_sockets()
 		logging.info(f"Starting web application on systemd sockets")
-		IdleShutdown().setup(app)
 		web.run_app(app, sock=sockets)
 	else:
 		logging.info(f"Starting web application on {args.address}:{args.port}")
